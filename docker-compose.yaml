@@ -1,0 +1,53 @@
+services:
+  app:
+    build: .
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      DATABASE_URI: mongodb://root:example@mongo:27017
+      DATABASE_CONNECTION_TIMEOUT_IN_SECONDS: 10
+    volumes:
+      - ./resources:/resources:ro
+    command: ["/resources/ports.json"]
+
+  mongo:
+    image: mongo:6.0
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 2s
+      timeout: 5s
+      retries: 3
+      start_period: 2s
+
+
+  mongo-express:
+    image: mongo-express
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: example
+      ME_CONFIG_MONGODB_SERVER: mongo
+    ports:
+      - "8081:8081"
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  linter:
+    image: golangci/golangci-lint:v1.64.5
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: ["golangci-lint", "run", "--timeout", "10m"]
+
+volumes:
+  mongo-data:
